@@ -1,0 +1,24 @@
+{
+  "version": "0.0.1",
+  "manifest_version": 3,
+  "name": "Cookie manager",
+  "action": {
+    "default_title": "Cookieeee",
+    "default_popup": "popup/cookie.html"
+  },
+  "permissions": ["activeTab", "scripting", "cookies", "<all_urls>"],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content_script/init.js"]
+    }
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "beastify@mozilla.org",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    }
+  }
+}
