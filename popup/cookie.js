@@ -83,13 +83,7 @@ function generateCookieTable(
                   className: "value-btns",
                   children: opts.copyColumns.includes(cookieProperty.field)
                     ? [
-                        createElement("button", {
-                          innerText: "copy",
-                          className: "copy",
-                          onClick: () => {
-                            copyTextToClipboard(cookie[cookieProperty.field]);
-                          },
-                        }),
+                        generateCopyButton(cookie[cookieProperty.field]),
                         generateEditButton(
                           { getElement: () => td },
                           cookie,
@@ -163,9 +157,10 @@ function showText(tdElement, value) {
   const p = createElement("p", { innerText: value });
   const valueDiv = td.querySelector(".value");
   valueDiv.replaceChild(p, td.querySelector("input"));
-  td.querySelector("button.cancel").replaceWith(
+  td.querySelector("button.cancel")?.replaceWith(
     generateEditButton(tdElement, value),
   );
+  td.querySelector("button.save")?.replaceWith(generateCopyButton(value));
 }
 
 function generateEditButton(elementObj, cookie, value) {
@@ -193,7 +188,12 @@ function generateSaveButton(input, cookie) {
     innerText: "save",
     className: "save",
     onClick: () => {
-      updateCookie({ ...cookie, value: input.value });
+      updateCookie({ ...cookie, value: input.value }).then(() => {
+        browser.cookies.getAll({}).then((cookies) => {
+          const cookieTable = generateCookieTable(cookies);
+          document.querySelector("table").replaceWith(cookieTable);
+        });
+      });
     },
   });
 }
@@ -201,9 +201,9 @@ function generateSaveButton(input, cookie) {
 function updateCookie(input) {
   const { hostOnly, session, ...rest } = input;
   let getActive = browser.tabs.query({ active: true, currentWindow: true });
-  getActive.then((tabs) => {
+  return getActive.then((tabs) => {
     const tab = tabs[0].url;
-    browser.cookies.set({
+    return browser.cookies.set({
       ...rest,
       url: tab,
       /**
@@ -215,5 +215,15 @@ function updateCookie(input) {
        */
       domain: hostOnly ? undefined : cookie.domain,
     });
+  });
+}
+
+function generateCopyButton(value) {
+  return createElement("button", {
+    innerText: "copy",
+    className: "copy",
+    onClick: () => {
+      copyTextToClipboard(value);
+    },
   });
 }
