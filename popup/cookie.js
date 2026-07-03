@@ -71,7 +71,6 @@ function generateCookieTable(
           return createElement("td", {
             thisElement: (element) => {
               td = element;
-              console.log(td);
             },
             className: generateTableClassname(cookieProperty.field),
             children: createElement("div", {
@@ -86,12 +85,14 @@ function generateCookieTable(
                     ? [
                         createElement("button", {
                           innerText: "copy",
+                          className: "copy",
                           onClick: () => {
                             copyTextToClipboard(cookie[cookieProperty.field]);
                           },
                         }),
                         generateEditButton(
                           { getElement: () => td },
+                          cookie,
                           cookie[cookieProperty.field],
                         ),
                       ]
@@ -131,7 +132,6 @@ function generateTableClassname(name) {
 function toggleColumn(column, isChecked) {
   const columnName = generateTableClassname(column);
   const tableElements = document.querySelectorAll(`.${columnName}`);
-  console.log(tableElements);
   for (const tableElement of tableElements) {
     if (!isChecked) {
       tableElement.classList.add("hidden");
@@ -145,13 +145,16 @@ function copyTextToClipboard(text) {
   navigator.clipboard.writeText(text);
 }
 
-function showEdit(tdElement, value) {
+function showEdit(tdElement, cookie, value) {
   const td = tdElement.getElement();
   const input = createElement("input", { value });
   const valueDiv = td.querySelector(".value");
   valueDiv.replaceChild(input, td.querySelector("p"));
   td.querySelector("button.edit").replaceWith(
     generateCancelButton(tdElement, value),
+  );
+  td.querySelector("button.copy").replaceWith(
+    generateSaveButton(input, cookie),
   );
 }
 
@@ -160,18 +163,17 @@ function showText(tdElement, value) {
   const p = createElement("p", { innerText: value });
   const valueDiv = td.querySelector(".value");
   valueDiv.replaceChild(p, td.querySelector("input"));
-  valueDiv.replaceChild(
-    generateEditButton(td, value),
-    td.querySelector("button.cancel"),
+  td.querySelector("button.cancel").replaceWith(
+    generateEditButton(tdElement, value),
   );
 }
 
-function generateEditButton(elementObj, value) {
+function generateEditButton(elementObj, cookie, value) {
   return createElement("button", {
     innerText: "edit",
     className: "edit",
     onClick: () => {
-      showEdit(elementObj, value);
+      showEdit(elementObj, cookie, value);
     },
   });
 }
@@ -183,5 +185,36 @@ function generateCancelButton(elementObj, value) {
     onClick: () => {
       showText(elementObj, value);
     },
+  });
+}
+
+function generateSaveButton(input, cookie) {
+  return createElement("button", {
+    innerText: "save",
+    className: "save",
+    onClick: () => {
+      updateCookie({ ...cookie, value: input.value });
+    },
+  });
+}
+
+function updateCookie(input) {
+  const { hostOnly, session, ...rest } = input;
+  console.log(rest.domain);
+  let getActive = browser.tabs.query({ active: true, currentWindow: true });
+  getActive.then((tabs) => {
+    const tab = tabs[0].url;
+    browser.cookies.set({
+      ...rest,
+      url: tab,
+      /**
+       * if domain is just cookie.domain and cookie is hostOnly, addons.firefox.com becomes .addons.firefox.com
+       * they are technically two different cookies, so instead of updating, it will create another one
+       * if the cookie is hostOnly (e.g. addons.firefox.com), setting domain to undefined will ensure
+       * that the cookie with domain addons.firefox.com is updated, otherwise it will just create a new
+       * cookie with .addons.firefox.com (as the cookie with this domain does not exist)
+       */
+      domain: hostOnly ? undefined : cookie.domain,
+    });
   });
 }
