@@ -200,7 +200,6 @@ function generateSaveButton(input, cookie) {
 
 function updateCookie(input) {
   const { hostOnly, session, ...rest } = input;
-  console.log(rest.domain);
   let getActive = browser.tabs.query({ active: true, currentWindow: true });
   getActive.then((tabs) => {
     const tab = tabs[0].url;
