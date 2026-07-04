@@ -24,7 +24,7 @@ function createElement(element, obj = {}) {
   return newElement;
 }
 
-const cookies = browser.cookies.getAll({}).then((cookies) => {
+const cookies = getCurrentCookies().then((cookies) => {
   const select = generateColumnCheckboxes(DEFAULT_COLUMNS);
 
   const cookieTable = generateCookieTable(cookies);
@@ -145,20 +145,20 @@ function showEdit(tdElement, cookie, value) {
   const valueDiv = td.querySelector(".value");
   valueDiv.replaceChild(input, td.querySelector("p"));
   td.querySelector("button.edit").replaceWith(
-    generateCancelButton(tdElement, value),
+    generateCancelButton(tdElement, cookie, value),
   );
   td.querySelector("button.copy").replaceWith(
     generateSaveButton(input, cookie),
   );
 }
 
-function showText(tdElement, value) {
+function showText(tdElement, cookie,value) {
   const td = tdElement.getElement();
   const p = createElement("p", { innerText: value });
   const valueDiv = td.querySelector(".value");
   valueDiv.replaceChild(p, td.querySelector("input"));
   td.querySelector("button.cancel")?.replaceWith(
-    generateEditButton(tdElement, value),
+    generateEditButton(tdElement, cookie, value),
   );
   td.querySelector("button.save")?.replaceWith(generateCopyButton(value));
 }
@@ -173,12 +173,12 @@ function generateEditButton(elementObj, cookie, value) {
   });
 }
 
-function generateCancelButton(elementObj, value) {
+function generateCancelButton(elementObj,cookie, value) {
   return createElement("button", {
     innerText: "cancel",
     className: "cancel",
     onClick: () => {
-      showText(elementObj, value);
+      showText(elementObj, cookie, value);
     },
   });
 }
@@ -189,7 +189,7 @@ function generateSaveButton(input, cookie) {
     className: "save",
     onClick: () => {
       updateCookie({ ...cookie, value: input.value }).then(() => {
-        browser.cookies.getAll({}).then((cookies) => {
+        getCurrentCookies().then((cookies) => {
           const cookieTable = generateCookieTable(cookies);
           document.querySelector("table").replaceWith(cookieTable);
         });
@@ -213,7 +213,7 @@ function updateCookie(input) {
        * that the cookie with domain addons.firefox.com is updated, otherwise it will just create a new
        * cookie with .addons.firefox.com (as the cookie with this domain does not exist)
        */
-      domain: hostOnly ? undefined : cookie.domain,
+      domain: hostOnly ? undefined : input.domain,
     });
   });
 }
@@ -226,4 +226,11 @@ function generateCopyButton(value) {
       copyTextToClipboard(value);
     },
   });
+}
+
+async function getCurrentCookies() {
+  const tabs = await browser.tabs.query({active: true, currentWindow: true})
+  const tab = tabs[0]
+  const url = tab.url
+  return await browser.cookies.getAll({ url })
 }
