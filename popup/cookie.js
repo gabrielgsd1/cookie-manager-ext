@@ -24,7 +24,7 @@ function createElement(element, obj = {}) {
   return newElement;
 }
 
-const cookies = browser.cookies.getAll({}).then((cookies) => {
+const cookies = getCurrentCookies().then((cookies) => {
   const select = generateColumnCheckboxes(DEFAULT_COLUMNS);
 
   const cookieTable = generateCookieTable(cookies);
@@ -71,7 +71,6 @@ function generateCookieTable(
           return createElement("td", {
             thisElement: (element) => {
               td = element;
-              console.log(td);
             },
             className: generateTableClassname(cookieProperty.field),
             children: createElement("div", {
@@ -84,14 +83,10 @@ function generateCookieTable(
                   className: "value-btns",
                   children: opts.copyColumns.includes(cookieProperty.field)
                     ? [
-                        createElement("button", {
-                          innerText: "copy",
-                          onClick: () => {
-                            copyTextToClipboard(cookie[cookieProperty.field]);
-                          },
-                        }),
+                        generateCopyButton(cookie[cookieProperty.field]),
                         generateEditButton(
                           { getElement: () => td },
+                          cookie,
                           cookie[cookieProperty.field],
                         ),
                       ]
@@ -131,7 +126,6 @@ function generateTableClassname(name) {
 function toggleColumn(column, isChecked) {
   const columnName = generateTableClassname(column);
   const tableElements = document.querySelectorAll(`.${columnName}`);
-  console.log(tableElements);
   for (const tableElement of tableElements) {
     if (!isChecked) {
       tableElement.classList.add("hidden");
@@ -145,43 +139,98 @@ function copyTextToClipboard(text) {
   navigator.clipboard.writeText(text);
 }
 
-function showEdit(tdElement, value) {
+function showEdit(tdElement, cookie, value) {
   const td = tdElement.getElement();
   const input = createElement("input", { value });
   const valueDiv = td.querySelector(".value");
   valueDiv.replaceChild(input, td.querySelector("p"));
   td.querySelector("button.edit").replaceWith(
-    generateCancelButton(tdElement, value),
+    generateCancelButton(tdElement, cookie, value),
+  );
+  td.querySelector("button.copy").replaceWith(
+    generateSaveButton(input, cookie),
   );
 }
 
-function showText(tdElement, value) {
+function showText(tdElement, cookie,value) {
   const td = tdElement.getElement();
   const p = createElement("p", { innerText: value });
   const valueDiv = td.querySelector(".value");
   valueDiv.replaceChild(p, td.querySelector("input"));
-  valueDiv.replaceChild(
-    generateEditButton(td, value),
-    td.querySelector("button.cancel"),
+  td.querySelector("button.cancel")?.replaceWith(
+    generateEditButton(tdElement, cookie, value),
   );
+  td.querySelector("button.save")?.replaceWith(generateCopyButton(value));
 }
 
-function generateEditButton(elementObj, value) {
+function generateEditButton(elementObj, cookie, value) {
   return createElement("button", {
     innerText: "edit",
     className: "edit",
     onClick: () => {
-      showEdit(elementObj, value);
+      showEdit(elementObj, cookie, value);
     },
   });
 }
 
-function generateCancelButton(elementObj, value) {
+function generateCancelButton(elementObj,cookie, value) {
   return createElement("button", {
     innerText: "cancel",
     className: "cancel",
     onClick: () => {
-      showText(elementObj, value);
+      showText(elementObj, cookie, value);
     },
   });
+}
+
+function generateSaveButton(input, cookie) {
+  return createElement("button", {
+    innerText: "save",
+    className: "save",
+    onClick: () => {
+      updateCookie({ ...cookie, value: input.value }).then(() => {
+        getCurrentCookies().then((cookies) => {
+          const cookieTable = generateCookieTable(cookies);
+          document.querySelector("table").replaceWith(cookieTable);
+        });
+      });
+    },
+  });
+}
+
+function updateCookie(input) {
+  const { hostOnly, session, ...rest } = input;
+  let getActive = browser.tabs.query({ active: true, currentWindow: true });
+  return getActive.then((tabs) => {
+    const tab = tabs[0].url;
+    return browser.cookies.set({
+      ...rest,
+      url: tab,
+      /**
+       * if domain is just cookie.domain and cookie is hostOnly, addons.firefox.com becomes .addons.firefox.com
+       * they are technically two different cookies, so instead of updating, it will create another one
+       * if the cookie is hostOnly (e.g. addons.firefox.com), setting domain to undefined will ensure
+       * that the cookie with domain addons.firefox.com is updated, otherwise it will just create a new
+       * cookie with .addons.firefox.com (as the cookie with this domain does not exist)
+       */
+      domain: hostOnly ? undefined : input.domain,
+    });
+  });
+}
+
+function generateCopyButton(value) {
+  return createElement("button", {
+    innerText: "copy",
+    className: "copy",
+    onClick: () => {
+      copyTextToClipboard(value);
+    },
+  });
+}
+
+async function getCurrentCookies() {
+  const tabs = await browser.tabs.query({active: true, currentWindow: true})
+  const tab = tabs[0]
+  const url = tab.url
+  return await browser.cookies.getAll({ url })
 }
