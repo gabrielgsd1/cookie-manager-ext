@@ -9,6 +9,9 @@ function createElement(element, obj = {}) {
   if (obj.classList) newElement.classList.add(...obj.classList.filter(Boolean));
   if (obj.className) newElement.className = obj.className;
   if (obj.innerText) newElement.innerText = obj.innerText;
+  if (obj.src) newElement.src = obj.src
+  if (obj.width) newElement.width = obj.width
+  if (obj.height) newElement.height = obj.height
   if (obj.type) newElement.type = obj.type;
   if (obj.value) newElement.value = obj.value;
   if (obj.label) newElement.label = obj.label;
@@ -33,34 +36,39 @@ function createElement(element, obj = {}) {
 
 const cookies = getCurrentCookies().then((cookies) => {
   const select = generateColumnCheckboxes(DEFAULT_COLUMNS);
-  const selectSort = generateSortSelect(DEFAULT_COLUMNS)
+  // const selectSort = generateSortSelect(DEFAULT_COLUMNS)
   const filterInput = generateFilterInput()
 
   const cookieTable = generateCookieTable(cookies);
   for (const selectItem of select) {
     document.body.appendChild(selectItem);
   }
-  document.body.appendChild(selectSort)
+  // document.body.appendChild(selectSort)
   document.body.appendChild(filterInput)
   document.body.appendChild(cookieTable);
 });
 
-const DEFAULT_COLUMNS = [
-  { name: "name", field: "name" },
-  { name: "domain", field: "domain" },
-  { name: "value", field: "value" },
-  { name: "expires", field: "expirationDate" },
-  { name: "secure", field: "secure" },
-  { name: "same site", field: "sameSite" },
-];
+const COPY = "copy"
+const EDIT = "edit"
 
-const DEFAULT_COPY_COLUMNS = ["value"];
+const DEFAULT_COLUMNS = [
+  { name: "name", field: "name", actions: [COPY, EDIT] },
+  { name: "domain", field: "domain", actions: [COPY] },
+  { name: "value", field: "value", actions: [COPY, EDIT] },
+  {
+    name: "expires", field: "expirationDate", actions: [COPY, EDIT], convert: (value) => {
+      if (!value) return '-'
+      return new Date(value * 1000).toISOString().split('T')[0]
+    }
+  },
+  // { name: "secure", field: "secure", actions: [COPY] },
+  // { name: "same site", field: "sameSite", actions: [COPY] },
+];
 
 function generateCookieTable(
   cookies,
   opts = {
     columns: DEFAULT_COLUMNS,
-    copyColumns: DEFAULT_COPY_COLUMNS,
   },
 ) {
   const cookieGroupDiv = createElement("table");
@@ -79,6 +87,7 @@ function generateCookieTable(
       return createElement("tr", {
         className: cookie.isPinned ? 'pinned-row' : undefined,
         children: opts.columns.map((cookieProperty, i) => {
+          const cookieFieldValue = cookieProperty.convert ? cookieProperty.convert(cookie[cookieProperty.field]) : cookie[cookieProperty.field]
           let td = null;
           return createElement("td", {
             thisElement: (element) => {
@@ -89,21 +98,19 @@ function generateCookieTable(
               className: "value",
               children: [
                 createElement("p", {
-                  innerText: cookie[cookieProperty.field],
+                  innerText: cookieFieldValue,
                 }),
                 createElement("div", {
                   className: "value-btns",
-                  children: opts.copyColumns.includes(cookieProperty.field)
-                    ? [
-                        generateCopyButton(cookie[cookieProperty.field]),
-                        generateEditButton(
-                          { getElement: () => td },
-                          cookie,
-                          cookie[cookieProperty.field],
-                        ),
-                        generatePinButton(cookie)
-                      ]
-                    : [],
+                  children: [
+                    ...(cookieFieldValue?.length > 0 && cookieProperty.actions.includes(COPY) ? [generateCopyButton(cookie[cookieProperty.field])] : []),
+                    ...(cookieFieldValue?.length > 0 && cookieProperty.actions.includes(EDIT) ? [generateEditButton(
+                      { getElement: () => td },
+                      cookie,
+                      cookieFieldValue
+                    )] : []),
+                    generatePinButton(cookie)
+                  ],
                 }),
               ],
             }),
@@ -135,13 +142,13 @@ function generateColumnCheckboxes(columns) {
 function generateSortSelect(columns) {
   const select = createElement("select")
   const options = columns.map((column) => {
-     select.append(createElement("option", {
+    select.append(createElement("option", {
       label: column.name,
       value: column.field
     }));
   });
 
-  
+
   return select
 }
 
@@ -156,7 +163,7 @@ function generateFilterInput() {
       }
     })
   })
-  
+
   return input
 }
 
@@ -193,7 +200,7 @@ function showEdit(tdElement, cookie, value) {
   );
 }
 
-function showText(tdElement, cookie,value) {
+function showText(tdElement, cookie, value) {
   const td = tdElement.getElement();
   const p = createElement("p", { innerText: value });
   const valueDiv = td.querySelector(".value");
@@ -204,19 +211,21 @@ function showText(tdElement, cookie,value) {
   td.querySelector("button.save")?.replaceWith(generateCopyButton(value));
 }
 
+const IMG_WIDTH = 16
+
 function generateEditButton(elementObj, cookie, value) {
   return createElement("button", {
-    innerText: "edit",
     className: "edit",
+    children: [createElement("img", { src: '../assets/pen.png', width: IMG_WIDTH })],
     onClick: () => {
       showEdit(elementObj, cookie, value);
     },
   });
 }
 
-function generateCancelButton(elementObj,cookie, value) {
+function generateCancelButton(elementObj, cookie, value) {
   return createElement("button", {
-    innerText: "cancel",
+    children: [createElement("img", { src: '../assets/back.png', width: IMG_WIDTH })],
     className: "cancel",
     onClick: () => {
       showText(elementObj, cookie, value);
@@ -226,7 +235,7 @@ function generateCancelButton(elementObj,cookie, value) {
 
 function generateSaveButton(input, cookie) {
   return createElement("button", {
-    innerText: "save",
+    children: [createElement("img", { src: '../assets/floppy-disk.png', width: IMG_WIDTH })],
     className: "save",
     onClick: () => {
       updateCookie({ ...cookie, value: input.value }).then(() => {
@@ -241,7 +250,7 @@ function generateSaveButton(input, cookie) {
 
 function generateCopyButton(value) {
   return createElement("button", {
-    innerText: "copy",
+    children: [createElement("img", { src: '../assets/copy.png', width: IMG_WIDTH })],
     className: "copy",
     onClick: () => {
       copyTextToClipboard(value);
@@ -251,7 +260,7 @@ function generateCopyButton(value) {
 
 function generatePinButton(cookie) {
   return createElement("button", {
-    innerText: !cookie.isPinned ? "pin" : 'unpin',
+    children: [createElement("img", { src: '../assets/thumbtacks.png', width: IMG_WIDTH })],
     className: "pin",
     onClick: () => {
       if (!cookie.isPinned) setPinnedCookie(cookie)
@@ -296,7 +305,7 @@ function unpinCookie(cookie) {
   const currentValue = localStorage.getItem(key)
   const parsedCurrentvalue = currentValue ? JSON.parse(currentValue) : []
 
-  localStorage.setItem(key, JSON.stringify(parsedCurrentvalue.filter(storageCookie => !(storageCookie.name === cookie.name && storageCookie.domain === cookie.domain) )))
+  localStorage.setItem(key, JSON.stringify(parsedCurrentvalue.filter(storageCookie => !(storageCookie.name === cookie.name && storageCookie.domain === cookie.domain))))
 }
 
 function getPinnedCookies() {
@@ -319,8 +328,8 @@ const FILTERABLE_VALUES = [
   },
 ]
 
-async function getCurrentCookies({ filter, sort } = { filter: '', sort: ''}) {
-  const tabs = await browser.tabs.query({active: true, currentWindow: true})
+async function getCurrentCookies({ filter, sort } = { filter: '', sort: '' }) {
+  const tabs = await browser.tabs.query({ active: true, currentWindow: true })
   const tab = tabs[0]
   const url = tab.url
   const cookies = await browser.cookies.getAll({ url })
