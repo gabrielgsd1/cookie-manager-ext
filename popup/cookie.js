@@ -72,21 +72,30 @@ function generateCookieTable(
   },
 ) {
   const cookieGroupDiv = createElement("table");
+  const th = createElement("th", {
+    innerText: "actions"
+  })
   const thead = createElement("thead", {
-    children: opts.columns.map((col) =>
+    children: [th, ...opts.columns.map((col) =>
       createElement("th", {
         className: generateTableClassname(col.field),
         innerText: col.name,
       }),
-    ),
+    )],
   });
   cookieGroupDiv.appendChild(thead);
 
   const tbody = createElement("tbody", {
     children: cookies.map((cookie) => {
+      const td = createElement("td", {
+        children: createElement("div", {
+          className: "actions",
+          children: [generatePinButton(cookie), generateCopyFullCookieButton(cookie)]
+        })
+      })
       return createElement("tr", {
         className: cookie.isPinned ? 'pinned-row' : undefined,
-        children: opts.columns.map((cookieProperty, i) => {
+        children: [td, ...opts.columns.map((cookieProperty, i) => {
           const cookieFieldValue = cookieProperty.convert ? cookieProperty.convert(cookie[cookieProperty.field]) : cookie[cookieProperty.field]
           let td = null;
           return createElement("td", {
@@ -107,15 +116,15 @@ function generateCookieTable(
                     ...(cookieFieldValue?.length > 0 && cookieProperty.actions.includes(EDIT) ? [generateEditButton(
                       { getElement: () => td },
                       cookie,
-                      cookieFieldValue
+                      cookieFieldValue,
+                      cookieProperty.field
                     )] : []),
-                    generatePinButton(cookie)
                   ],
                 }),
               ],
             }),
           });
-        }),
+        })],
       });
     }),
   });
@@ -187,16 +196,16 @@ function copyTextToClipboard(text) {
   navigator.clipboard.writeText(text);
 }
 
-function showEdit(tdElement, cookie, value) {
+function showEdit(tdElement, cookie, value, cookieProperty) {
   const td = tdElement.getElement();
-  const input = createElement("input", { value });
+  const input = createElement("textarea", { value });
   const valueDiv = td.querySelector(".value");
   valueDiv.replaceChild(input, td.querySelector("p"));
   td.querySelector("button.edit").replaceWith(
     generateCancelButton(tdElement, cookie, value),
   );
   td.querySelector("button.copy").replaceWith(
-    generateSaveButton(input, cookie),
+    generateSaveButton(input, cookie, cookieProperty),
   );
 }
 
@@ -213,12 +222,12 @@ function showText(tdElement, cookie, value) {
 
 const IMG_WIDTH = 16
 
-function generateEditButton(elementObj, cookie, value) {
+function generateEditButton(elementObj, cookie, value, cookieProperty) {
   return createElement("button", {
     className: "edit",
     children: [createElement("img", { src: '../assets/pen.png', width: IMG_WIDTH })],
     onClick: () => {
-      showEdit(elementObj, cookie, value);
+      showEdit(elementObj, cookie, value, cookieProperty);
     },
   });
 }
@@ -233,12 +242,12 @@ function generateCancelButton(elementObj, cookie, value) {
   });
 }
 
-function generateSaveButton(input, cookie) {
+function generateSaveButton(input, cookie, cookieProperty) {
   return createElement("button", {
     children: [createElement("img", { src: '../assets/floppy-disk.png', width: IMG_WIDTH })],
     className: "save",
     onClick: () => {
-      updateCookie({ ...cookie, value: input.value }).then(() => {
+      updateCookie({ ...cookie, [cookieProperty]: input.value }).then(() => {
         getCurrentCookies().then((cookies) => {
           const cookieTable = generateCookieTable(cookies);
           document.querySelector("table").replaceWith(cookieTable);
@@ -268,6 +277,16 @@ function generatePinButton(cookie) {
       getCurrentCookies({ filter: getFilterInputValue() }).then(cookies => refreshCookieTable(cookies))
     },
   });
+}
+
+function generateCopyFullCookieButton(cookie) {
+  return createElement("button", {
+    children: createElement("img", { src: "../assets/cookie.png", width: IMG_WIDTH }),
+    onClick: () => {
+      const { hostOnly, session, isPinned, domain, ...creatableCookie } = cookie;
+      navigator.clipboard.writeText(JSON.stringify(creatableCookie))
+    }
+  })
 }
 
 function updateCookie(input) {

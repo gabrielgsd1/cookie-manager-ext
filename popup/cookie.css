@@ -122,7 +122,8 @@ td .value {
 
 /* Estilização do input quando entra em modo de edição */
 .value input[type="text"],
-.value input:not([type]) {
+.value input:not([type]),
+.value textarea {
   width: 100%;
   max-width: 18rem;
   padding: 0.35rem 0.5rem;
@@ -292,4 +293,9 @@ input[type="text"].error:focus {
 }
 .pinned {
   background-color: green;
+}
+
+td .actions {
+  display: flex;
+  gap: 0.4rem;
 }
